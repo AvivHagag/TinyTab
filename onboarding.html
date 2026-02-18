@@ -1,0 +1,503 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>TinyTab — Setup</title>
+    <style>
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      body {
+        font-family:
+          system-ui,
+          -apple-system,
+          BlinkMacSystemFont,
+          "Segoe UI",
+          sans-serif;
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: linear-gradient(
+          135deg,
+          #f0f4ff 0%,
+          #faf5ff 50%,
+          #f0fdf4 100%
+        );
+        padding: 24px;
+      }
+
+      .wrapper {
+        width: 100%;
+        max-width: 520px;
+      }
+
+      /* ── Hero ── */
+      .hero {
+        text-align: center;
+        margin-bottom: 32px;
+      }
+
+      .logo {
+        width: 208px;
+        height: 208px;
+        object-fit: contain;
+        margin-bottom: 20px;
+        filter: drop-shadow(0 8px 20px rgba(0, 0, 0, 0.2));
+        animation: floatIn 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
+      }
+
+      @keyframes floatIn {
+        from {
+          opacity: 0;
+          transform: translateY(20px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      .hero h1 {
+        font-size: 34px;
+        font-weight: 800;
+        letter-spacing: -0.5px;
+        color: #111;
+        margin-bottom: 10px;
+      }
+
+      .hero p {
+        font-size: 18px;
+        color: #6b7280;
+        line-height: 1.6;
+      }
+
+      /* ── Card ── */
+      .card {
+        background: #fff;
+        border: 1px solid rgba(0, 0, 0, 0.07);
+        border-radius: 20px;
+        padding: 24px;
+        box-shadow:
+          0 4px 24px rgba(0, 0, 0, 0.06),
+          0 1px 4px rgba(0, 0, 0, 0.04);
+      }
+
+      .section-label {
+        font-size: 13px;
+        font-weight: 600;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: #9ca3af;
+        margin-bottom: 12px;
+      }
+
+      /* ── Mode options ── */
+      .modes {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        margin-bottom: 24px;
+      }
+
+      .mode-option {
+        position: relative;
+      }
+
+      .mode-option input[type="radio"] {
+        position: absolute;
+        opacity: 0;
+        width: 0;
+        height: 0;
+      }
+
+      .mode-label {
+        display: flex;
+        align-items: flex-start;
+        gap: 14px;
+        padding: 16px;
+        border-radius: 14px;
+        border: 2px solid #e5e7eb;
+        cursor: pointer;
+        transition:
+          border-color 0.18s,
+          background 0.18s,
+          box-shadow 0.18s;
+        background: #fafafa;
+      }
+
+      .mode-option input:checked + .mode-label {
+        border-color: #6366f1;
+        background: #f5f3ff;
+        box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.08);
+      }
+
+      .mode-label:hover {
+        border-color: #a5b4fc;
+        background: #f8f7ff;
+      }
+
+      .mode-icon {
+        width: 38px;
+        height: 38px;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 22px;
+        flex-shrink: 0;
+        margin-top: 1px;
+      }
+
+      .mode-icon.dia {
+        background: #eff6ff;
+      }
+      .mode-icon.chrome {
+        background: #f0fdf4;
+      }
+
+      .mode-text {
+        flex: 1;
+      }
+
+      .mode-title {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 17px;
+        font-weight: 600;
+        color: #111;
+        margin-bottom: 4px;
+      }
+
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        font-size: 12.5px;
+        font-weight: 600;
+        letter-spacing: 0.02em;
+        padding: 2px 9px;
+        border-radius: 999px;
+        background: #e0e7ff;
+        color: #4338ca;
+      }
+
+      .badge.green {
+        background: #dcfce7;
+        color: #15803d;
+      }
+
+      .mode-desc {
+        font-size: 15px;
+        color: #6b7280;
+        line-height: 1.5;
+      }
+
+      .check-circle {
+        width: 20px;
+        height: 20px;
+        border-radius: 50%;
+        border: 2px solid #d1d5db;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        margin-top: 9px;
+        transition:
+          border-color 0.18s,
+          background 0.18s;
+      }
+
+      .mode-option input:checked ~ .mode-label .check-circle {
+        border-color: #6366f1;
+        background: #6366f1;
+      }
+
+      .check-circle::after {
+        content: "";
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: #fff;
+        opacity: 0;
+        transition: opacity 0.15s;
+      }
+
+      .mode-option input:checked ~ .mode-label .check-circle::after {
+        opacity: 1;
+      }
+
+      /* ── Divider ── */
+      .divider {
+        border: none;
+        border-top: 1px solid #f3f4f6;
+        margin-bottom: 20px;
+      }
+
+      /* ── Rules ── */
+      .rules {
+        background: #f9fafb;
+        border-radius: 12px;
+        padding: 14px 16px;
+        margin-bottom: 22px;
+      }
+
+      .rules-title {
+        font-size: 14px;
+        font-weight: 600;
+        color: #374151;
+        margin-bottom: 8px;
+      }
+
+      .rules ul {
+        list-style: none;
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+      }
+
+      .rules li {
+        font-size: 15px;
+        color: #6b7280;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .rules li::before {
+        content: "";
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: #c7d2fe;
+        flex-shrink: 0;
+      }
+
+      code {
+        background: #ede9fe;
+        color: #4c1d95;
+        padding: 1px 6px;
+        border-radius: 5px;
+        font-size: 14px;
+        font-family: ui-monospace, "SF Mono", monospace;
+      }
+
+      /* ── Save button ── */
+      .save-row {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+      }
+
+      .btn-save {
+        flex-shrink: 0;
+        padding: 11px 28px;
+        border-radius: 12px;
+        border: none;
+        cursor: pointer;
+        font-size: 16px;
+        font-weight: 600;
+        color: #fff;
+        background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+        box-shadow: 0 4px 14px rgba(99, 102, 241, 0.35);
+        transition:
+          transform 0.15s,
+          box-shadow 0.15s,
+          opacity 0.15s;
+      }
+
+      .btn-save:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 6px 18px rgba(99, 102, 241, 0.4);
+      }
+      .btn-save:active {
+        transform: translateY(0);
+        box-shadow: 0 2px 8px rgba(99, 102, 241, 0.3);
+      }
+
+      #status {
+        font-size: 15.5px;
+        color: #16a34a;
+        font-weight: 500;
+        opacity: 0;
+        transition: opacity 0.25s;
+      }
+
+      #status.visible {
+        opacity: 1;
+      }
+
+      .btn-save.hidden {
+        opacity: 0;
+        visibility: hidden;
+        pointer-events: none;
+        width: 0;
+        padding-left: 0;
+        padding-right: 0;
+        overflow: hidden;
+        transition:
+          opacity 0.2s,
+          width 0.2s,
+          padding 0.2s,
+          visibility 0.2s;
+      }
+
+      /* ── Responsive ── */
+      @media (max-width: 480px) {
+        body {
+          padding: 16px;
+          align-items: flex-start;
+          padding-top: 32px;
+        }
+
+        .logo {
+          width: 208px;
+          height: 208px;
+          margin-bottom: 16px;
+        }
+
+        .hero h1 {
+          font-size: 28px;
+        }
+        .hero p {
+          font-size: 16.5px;
+        }
+        .hero {
+          margin-bottom: 24px;
+        }
+
+        .card {
+          padding: 18px;
+          border-radius: 18px;
+        }
+
+        .mode-label {
+          padding: 13px;
+          gap: 11px;
+        }
+        .mode-icon {
+          width: 34px;
+          height: 34px;
+          font-size: 20px;
+        }
+        .mode-title {
+          font-size: 16px;
+        }
+        .mode-desc {
+          font-size: 14.5px;
+        }
+
+        .btn-save {
+          padding: 12px 22px;
+          font-size: 16px;
+          width: 100%;
+          justify-content: center;
+        }
+        .save-row {
+          flex-direction: column;
+          align-items: flex-start;
+        }
+        #status {
+          font-size: 15px;
+        }
+      }
+
+      @media (max-width: 360px) {
+        .hero h1 {
+          font-size: 24px;
+        }
+        .badge {
+          display: none;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrapper">
+      <!-- Hero -->
+      <div class="hero">
+        <img src="TinyTabLogo.png" alt="TinyTab logo" class="logo" />
+        <h1>Welcome to TinyTab</h1>
+        <p>
+          Pick the mode that fits your browser.<br />You can change this any
+          time in the extension options.
+        </p>
+      </div>
+
+      <!-- Card -->
+      <div class="card">
+        <div class="section-label">Choose your mode</div>
+
+        <div class="modes">
+          <!-- Dia -->
+          <div class="mode-option">
+            <input type="radio" name="mode" id="dia" value="DIA" />
+            <label class="mode-label" for="dia">
+              <div class="mode-icon dia">🏷️</div>
+              <div class="mode-text">
+                <div class="mode-title">
+                  Dia
+                  <span class="badge">Rename only</span>
+                </div>
+                <div class="mode-desc">
+                  Uses your existing tab groups. The extension never reorders or
+                  groups tabs.
+                </div>
+              </div>
+              <div class="check-circle"></div>
+            </label>
+          </div>
+
+          <!-- Chrome -->
+          <div class="mode-option">
+            <input
+              type="radio"
+              name="mode"
+              id="chrome"
+              value="CHROME"
+              checked
+            />
+            <label class="mode-label" for="chrome">
+              <div class="mode-icon chrome">🗂️</div>
+              <div class="mode-text">
+                <div class="mode-title">
+                  Chrome
+                  <span class="badge green">Reorder + Real Groups</span>
+                </div>
+                <div class="mode-desc">
+                  Reorders tabs by domain and creates real Chrome tab groups
+                  with colors.
+                </div>
+              </div>
+              <div class="check-circle"></div>
+            </label>
+          </div>
+        </div>
+
+        <hr class="divider" />
+
+        <!-- Rules -->
+        <div class="rules">
+          <div class="rules-title">Naming rules</div>
+          <ul>
+            <li>1 tab per domain → group named <code>Domain</code></li>
+            <li>2+ tabs per domain → unique one-word labels per tab</li>
+          </ul>
+        </div>
+
+        <!-- Save -->
+        <div class="save-row">
+          <button class="btn-save" id="save">Get Started</button>
+          <span id="status"></span>
+        </div>
+      </div>
+    </div>
+    <script src="onboarding.js"></script>
+  </body>
+</html>

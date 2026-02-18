@@ -1,0 +1,258 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+      body {
+        font-family: system-ui, -apple-system, sans-serif;
+        width: 360px;
+        background: #1c1c1e;
+        color: #fff;
+        overflow: hidden;
+      }
+
+      /* ── Header ── */
+      .header {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 14px 16px 10px;
+        border-bottom: 1px solid rgba(255,255,255,0.08);
+      }
+      .header-title {
+        font-size: 15px;
+        font-weight: 700;
+        flex: 1;
+        letter-spacing: 0.01em;
+      }
+
+      /* Toggle switch */
+      .switch { position: relative; width: 36px; height: 20px; flex-shrink: 0; }
+      .switch input { opacity: 0; width: 0; height: 0; }
+      .slider {
+        position: absolute; inset: 0;
+        background: #48484a;
+        border-radius: 999px;
+        cursor: pointer;
+        transition: background 0.2s;
+      }
+      .slider::before {
+        content: '';
+        position: absolute;
+        width: 14px; height: 14px;
+        left: 3px; top: 3px;
+        background: #fff;
+        border-radius: 50%;
+        transition: transform 0.2s;
+      }
+      .switch input:checked + .slider { background: #30d158; }
+      .switch input:checked + .slider::before { transform: translateX(16px); }
+
+      /* ── Settings rows ── */
+      .settings {
+        padding: 8px 16px 4px;
+        border-bottom: 1px solid rgba(255,255,255,0.08);
+      }
+      .row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 7px 0;
+        font-size: 13px;
+        color: rgba(255,255,255,0.75);
+      }
+
+      /* ── Groups section ── */
+      .groups-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 10px 16px 6px;
+      }
+      .groups-label {
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: rgba(255,255,255,0.4);
+      }
+      .groups-count {
+        font-size: 11px;
+        color: rgba(255,255,255,0.35);
+      }
+
+      #groupList {
+        padding: 0 10px 10px;
+        max-height: 320px;
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+      }
+      #groupList::-webkit-scrollbar { width: 4px; }
+      #groupList::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 4px; }
+
+      .no-groups {
+        text-align: center;
+        padding: 24px 0;
+        font-size: 13px;
+        color: rgba(255,255,255,0.3);
+      }
+
+      /* ── Group card (styled like image 2) ── */
+      .group-card {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        background: #2c2c2e;
+        border-radius: 12px;
+        padding: 8px 10px 8px 12px;
+        border-left: 3px solid var(--gc);
+        min-width: 0;
+      }
+
+      .group-name {
+        font-size: 13px;
+        font-weight: 600;
+        color: #fff;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;  /* static — no scroll animation */
+        max-width: 80px;
+        flex-shrink: 0;
+      }
+
+      .group-tabs {
+        display: flex;
+        gap: 5px;
+        flex: 1;
+        overflow: hidden;
+        align-items: center;
+      }
+
+      .tab-pill {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        background: rgba(255,255,255,0.09);
+        border-radius: 999px;
+        padding: 3px 8px 3px 5px;
+        cursor: pointer;
+        flex-shrink: 0;
+        max-width: 110px;
+        transition: background 0.15s;
+      }
+      .tab-pill:hover { background: rgba(255,255,255,0.18); }
+
+      .tab-pill img {
+        width: 13px;
+        height: 13px;
+        border-radius: 2px;
+        flex-shrink: 0;
+        object-fit: contain;
+      }
+      .tab-pill .tab-label {
+        font-size: 12px;
+        color: rgba(255,255,255,0.9);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 75px;
+      }
+
+      .tab-overflow {
+        font-size: 11px;
+        color: rgba(255,255,255,0.4);
+        flex-shrink: 0;
+        padding: 0 2px;
+      }
+
+      .group-close {
+        flex-shrink: 0;
+        width: 22px;
+        height: 22px;
+        border-radius: 50%;
+        background: rgba(255,255,255,0.07);
+        border: none;
+        color: rgba(255,255,255,0.5);
+        font-size: 14px;
+        line-height: 1;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: background 0.15s, color 0.15s;
+      }
+      .group-close:hover {
+        background: rgba(255,59,48,0.25);
+        color: #ff3b30;
+      }
+
+      /* ── Footer ── */
+      .footer {
+        border-top: 1px solid rgba(255,255,255,0.08);
+        padding: 8px 16px;
+        text-align: right;
+      }
+      .footer a {
+        font-size: 12px;
+        color: rgba(255,255,255,0.4);
+        text-decoration: none;
+      }
+      .footer a:hover { color: rgba(255,255,255,0.7); }
+    </style>
+  </head>
+  <body>
+
+    <!-- Header -->
+    <div class="header">
+      <span style="font-size:17px">⚡</span>
+      <span class="header-title">TinyTab</span>
+      <label class="switch" title="Enable / Disable">
+        <input id="enabled" type="checkbox" />
+        <span class="slider"></span>
+      </label>
+    </div>
+
+    <!-- Settings -->
+    <div class="settings">
+      <div class="row">
+        <span>Auto arrange</span>
+        <label class="switch">
+          <input id="autoArrange" type="checkbox" />
+          <span class="slider"></span>
+        </label>
+      </div>
+      <div class="row">
+        <span>Auto group</span>
+        <label class="switch">
+          <input id="autoGroup" type="checkbox" />
+          <span class="slider"></span>
+        </label>
+      </div>
+      <div class="row">
+        <span>Ungroup before regroup</span>
+        <label class="switch">
+          <input id="ungroupBeforeGrouping" type="checkbox" />
+          <span class="slider"></span>
+        </label>
+      </div>
+    </div>
+
+    <!-- Active Groups -->
+    <div class="groups-header">
+      <span class="groups-label">Active Groups</span>
+      <span class="groups-count" id="groupsCount"></span>
+    </div>
+    <div id="groupList"><div class="no-groups">No active groups</div></div>
+
+    <!-- Footer -->
+    <div class="footer">
+      <a href="#" id="openOptions">Browser mode &amp; options</a>
+    </div>
+
+    <script src="popup.js"></script>
+  </body>
+</html>

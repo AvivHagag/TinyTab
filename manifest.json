@@ -1,0 +1,30 @@
+{
+  "manifest_version": 3,
+  "name": "TinyTab",
+  "version": "1.3.0",
+  "description": "Shortens tab titles, keeps same-domain tabs unique with one-word labels. Chrome mode reorders tabs and creates Chrome Tab Groups.",
+  "action": {
+    "default_title": "TinyTab",
+    "default_popup": "popup.html"
+  },
+  "options_page": "onboarding.html",
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "permissions": ["tabs", "storage", "tabGroups"],
+  "host_permissions": ["<all_urls>"],
+  "background": {
+    "service_worker": "service_worker.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}
