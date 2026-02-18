@@ -66,7 +66,10 @@ function escapeRegExp(s) {
 }
 
 function normalizeTitle(title) {
-  return (title || "").replace(/\s+/g, " ").trim();
+  return (title || "")
+    .replace(/^\(\d+\)\s*/, "") // strip leading notification counts like (119)
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function stripTrailingSitePart(title, domainLbl) {
@@ -129,7 +132,8 @@ function tokenizeWords(s) {
     .split(" ")
     .filter(Boolean)
     .filter((w) => w.length >= 3)
-    .filter((w) => !stop.has(w));
+    .filter((w) => !stop.has(w))
+    .filter((w) => !/^\d+$/.test(w)); // skip pure numbers
 }
 
 function shortestUniqueOneWord(labels) {
@@ -204,21 +208,53 @@ function gmailLabelFromUrl(url) {
   return decodeURIComponent(simple.split("/")[0] || "");
 }
 
+/* Pick the most meaningful segment from a URL path.
+   Skips random-looking IDs (long all-caps/hex strings). */
+function meaningfulPathSegment(url) {
+  const u = safeUrl(url);
+  if (!u) return "";
+  const segments = u.pathname
+    .split("/")
+    .filter(Boolean)
+    .map((s) => {
+      try {
+        return decodeURIComponent(s);
+      } catch {
+        return s;
+      }
+    });
+
+  // Walk from the end; prefer human-readable segments over IDs
+  for (let i = segments.length - 1; i >= 0; i--) {
+    const seg = segments[i];
+    // Looks like a random ID → skip (e.g. "XvJJ_29RJpE", UUIDs, long hex)
+    if (seg.length > 24 || /^[A-Z0-9_-]{6,}$/.test(seg)) continue;
+    const word = seg.toLowerCase().replace(/[-_]/g, " ").trim().split(" ")[0];
+    if (word && word.length >= 2) return word;
+  }
+  return "";
+}
+
 function youtubeWordFromUrlAndTitle(url, title) {
   const u = safeUrl(url);
   if (!u) return "";
   const p = u.pathname || "/";
 
+  // Fixed path shortcuts (always reliable regardless of title language)
   if (p.startsWith("/watch")) return "watch";
   if (p.startsWith("/shorts")) return "shorts";
   if (p.startsWith("/results")) return "search";
   if (p.startsWith("/channel/")) return "channel";
   if (p.startsWith("/@")) return p.split("/")[1].replace("@", "") || "channel";
 
+  // Try title-based extraction first
   const words = tokenizeWords(
     stripTrailingSitePart(normalizeTitle(title), "YouTube"),
   );
-  return words[0] || "youtube";
+  if (words.length > 0) return words[0];
+
+  // Fall back to URL path — works for any language (history, playlist, etc.)
+  return meaningfulPathSegment(url) || "youtube";
 }
 
 function oneWordLabelForTab(tab, regDom, host) {
@@ -243,7 +279,13 @@ function oneWordLabelForTab(tab, regDom, host) {
   }
 
   const stripped = stripTrailingSitePart(title, domLbl);
-  return tokenizeWords(stripped)[0] || domLbl.toLowerCase() || "tab";
+  // Fall back to URL path when title is in a non-Latin script or otherwise empty
+  return (
+    tokenizeWords(stripped)[0] ||
+    meaningfulPathSegment(tab.url || "") ||
+    domLbl.toLowerCase() ||
+    "tab"
+  );
 }
 
 /* ------------------------
@@ -304,7 +346,8 @@ async function arrangeAndGroupChrome(windowId, settings) {
     const items = normal.map((t) => {
       const host = hostOf(t.url || "");
       const reg = registrableDomain(host) || host || "unknown";
-      return { tab: t, key: reg };
+      const key = isGmail(host) ? "mail.google.com" : reg;
+      return { tab: t, key };
     });
 
     const desiredByDom = new Map();
@@ -412,8 +455,9 @@ async function arrangeAndGroupChrome(windowId, settings) {
     for (const t of afterNormal) {
       const host = hostOf(t.url || "");
       const reg = registrableDomain(host) || host || "unknown";
-      if (!byDom.has(reg)) byDom.set(reg, []);
-      byDom.get(reg).push(t.id);
+      const key = isGmail(host) ? "mail.google.com" : reg;
+      if (!byDom.has(key)) byDom.set(key, []);
+      byDom.get(key).push(t.id);
     }
 
     // Create groups for domains with N+ tabs
@@ -437,10 +481,58 @@ async function arrangeAndGroupChrome(windowId, settings) {
 }
 
 /* ------------------------
+   Dia mode: group similar-domain tabs
+   ------------------------ */
+async function groupSimilarTabsDia(windowId, settings) {
+  if (!settings.autoGroup || isMutatingTabs) return;
+  isMutatingTabs = true;
+
+  try {
+    const all = await chrome.tabs.query({ windowId });
+    const normal = all.filter(
+      (t) => !t.pinned && t.id != null && isRenamableUrl(t.url || ""),
+    );
+
+    // Build domain → tabs map
+    const byDomain = new Map();
+    for (const t of normal) {
+      const host = hostOf(t.url || "");
+      const reg = registrableDomain(host) || host || "unknown";
+      const key = isGmail(host) ? "mail.google.com" : reg;
+      if (!byDomain.has(key)) byDomain.set(key, []);
+      byDomain.get(key).push(t);
+    }
+
+    for (const [reg, tabs] of byDomain.entries()) {
+      if (tabs.length < settings.groupMinTabs) continue;
+
+      // All already share the same group — nothing to do
+      const firstGid = tabs[0].groupId;
+      if (firstGid !== -1 && tabs.every((t) => t.groupId === firstGid))
+        continue;
+
+      // Group all domain tabs together (reuse an existing group if possible)
+      const tabIds = tabs.map((t) => t.id).filter(Boolean);
+      const existingGid = tabs.find((t) => t.groupId !== -1)?.groupId;
+
+      await chrome.tabs
+        .group(
+          existingGid != null ? { tabIds, groupId: existingGid } : { tabIds },
+        )
+        .catch(() => null);
+    }
+  } finally {
+    setTimeout(() => {
+      isMutatingTabs = false;
+    }, 250);
+  }
+}
+
+/* ------------------------
    Rename logic: Dia vs Chrome
    ------------------------ */
 function scopeKeyForTab(settings, tab) {
-  // Dia mode: uniqueness inside each existing group
+  // Dia mode: uniqueness inside each group (domain-grouped or Dia-native)
   if (settings.browserMode === "DIA") {
     const gid = tab.groupId;
     return typeof gid === "number" && gid !== -1 ? `g:${gid}` : "g:ungrouped";
@@ -459,6 +551,11 @@ async function recomputeAll() {
   // Chrome mode: reorder + group first
   if (settings.browserMode === "CHROME" && windowId != null) {
     await arrangeAndGroupChrome(windowId, settings);
+  }
+
+  // Dia mode: group tabs that share the same domain (without reordering)
+  if (settings.browserMode === "DIA" && windowId != null) {
+    await groupSimilarTabsDia(windowId, settings);
   }
 
   // Then rename

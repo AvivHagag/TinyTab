@@ -20,13 +20,27 @@
     }
   });
 
+  function isContextValid() {
+    try {
+      return !!chrome.runtime?.id;
+    } catch {
+      return false;
+    }
+  }
+
   const titleEl = document.querySelector("title");
   if (titleEl) {
     const obs = new MutationObserver(() => {
+      if (!isContextValid()) {
+        obs.disconnect();
+        return;
+      }
       // Ignore changes the extension itself made to avoid a feedback loop
       if (document.title === _lastApplied) return;
       _lastApplied = null;
-      chrome.runtime.sendMessage({ type: "PAGE_TITLE_CHANGED" });
+      try {
+        chrome.runtime.sendMessage({ type: "PAGE_TITLE_CHANGED" });
+      } catch (_) {}
     });
     obs.observe(titleEl, { childList: true });
   }

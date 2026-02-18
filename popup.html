@@ -2,255 +2,389 @@
 <html>
   <head>
     <meta charset="utf-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="script-src 'self'; object-src 'self';"
+    />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>TinyTab</title>
+
     <style>
-      *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+      }
+
+      :root {
+        --bgTop: #1c1c1e;
+        --bgMid: #121214;
+        --bgBot: #0c0c0d;
+
+        --text: rgba(255, 255, 255, 0.92);
+        --muted: rgba(255, 255, 255, 0.55);
+        --line: rgba(255, 255, 255, 0.08);
+      }
 
       body {
-        font-family: system-ui, -apple-system, sans-serif;
-        width: 360px;
-        background: #1c1c1e;
-        color: #fff;
+        width: 760px; /* feels like a strip */
+        max-width: 100%;
+        background: linear-gradient(
+          180deg,
+          var(--bgTop) 0%,
+          var(--bgMid) 65%,
+          var(--bgBot) 100%
+        );
+        color: var(--text);
+        font-family:
+          system-ui,
+          -apple-system,
+          sans-serif;
         overflow: hidden;
       }
 
-      /* ── Header ── */
-      .header {
+      /* Top mini bar (like Dia left controls area) */
+      .top {
         display: flex;
         align-items: center;
+        gap: 10px;
+        padding: 10px 12px;
+        border-bottom: 1px solid var(--line);
+      }
+      .dotbar {
+        display: flex;
         gap: 8px;
-        padding: 14px 16px 10px;
-        border-bottom: 1px solid rgba(255,255,255,0.08);
       }
-      .header-title {
-        font-size: 15px;
-        font-weight: 700;
-        flex: 1;
-        letter-spacing: 0.01em;
-      }
-
-      /* Toggle switch */
-      .switch { position: relative; width: 36px; height: 20px; flex-shrink: 0; }
-      .switch input { opacity: 0; width: 0; height: 0; }
-      .slider {
-        position: absolute; inset: 0;
-        background: #48484a;
+      .dot {
+        width: 12px;
+        height: 12px;
         border-radius: 999px;
-        cursor: pointer;
-        transition: background 0.2s;
       }
-      .slider::before {
-        content: '';
-        position: absolute;
-        width: 14px; height: 14px;
-        left: 3px; top: 3px;
-        background: #fff;
-        border-radius: 50%;
-        transition: transform 0.2s;
+      .dot.r {
+        background: #ff5f57;
       }
-      .switch input:checked + .slider { background: #30d158; }
-      .switch input:checked + .slider::before { transform: translateX(16px); }
+      .dot.y {
+        background: #febc2e;
+      }
+      .dot.g {
+        background: #28c840;
+      }
 
-      /* ── Settings rows ── */
-      .settings {
-        padding: 8px 16px 4px;
-        border-bottom: 1px solid rgba(255,255,255,0.08);
-      }
-      .row {
+      .brand {
         display: flex;
         align-items: center;
-        justify-content: space-between;
-        padding: 7px 0;
-        font-size: 13px;
-        color: rgba(255,255,255,0.75);
-      }
-
-      /* ── Groups section ── */
-      .groups-header {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        padding: 10px 16px 6px;
-      }
-      .groups-label {
-        font-size: 11px;
-        font-weight: 600;
-        letter-spacing: 0.06em;
-        text-transform: uppercase;
-        color: rgba(255,255,255,0.4);
-      }
-      .groups-count {
-        font-size: 11px;
-        color: rgba(255,255,255,0.35);
-      }
-
-      #groupList {
-        padding: 0 10px 10px;
-        max-height: 320px;
-        overflow-y: auto;
-        display: flex;
-        flex-direction: column;
-        gap: 5px;
-      }
-      #groupList::-webkit-scrollbar { width: 4px; }
-      #groupList::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 4px; }
-
-      .no-groups {
-        text-align: center;
-        padding: 24px 0;
-        font-size: 13px;
-        color: rgba(255,255,255,0.3);
-      }
-
-      /* ── Group card (styled like image 2) ── */
-      .group-card {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        background: #2c2c2e;
-        border-radius: 12px;
-        padding: 8px 10px 8px 12px;
-        border-left: 3px solid var(--gc);
+        gap: 10px;
+        margin-left: 4px;
         min-width: 0;
       }
-
-      .group-name {
+      .logo {
+        width: 18px;
+        height: 18px;
+        border-radius: 6px;
+        background: linear-gradient(
+          135deg,
+          rgba(242, 163, 107, 0.95),
+          rgba(122, 167, 255, 0.95)
+        );
+        box-shadow:
+          0 10px 20px rgba(0, 0, 0, 0.35),
+          inset 0 1px 0 rgba(255, 255, 255, 0.16);
+      }
+      .title {
+        font-weight: 900;
         font-size: 13px;
-        font-weight: 600;
-        color: #fff;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;  /* static — no scroll animation */
-        max-width: 80px;
-        flex-shrink: 0;
+        letter-spacing: 0.02em;
       }
-
-      .group-tabs {
-        display: flex;
-        gap: 5px;
-        flex: 1;
-        overflow: hidden;
-        align-items: center;
-      }
-
-      .tab-pill {
-        display: flex;
-        align-items: center;
-        gap: 4px;
-        background: rgba(255,255,255,0.09);
-        border-radius: 999px;
-        padding: 3px 8px 3px 5px;
-        cursor: pointer;
-        flex-shrink: 0;
-        max-width: 110px;
-        transition: background 0.15s;
-      }
-      .tab-pill:hover { background: rgba(255,255,255,0.18); }
-
-      .tab-pill img {
-        width: 13px;
-        height: 13px;
-        border-radius: 2px;
-        flex-shrink: 0;
-        object-fit: contain;
-      }
-      .tab-pill .tab-label {
+      .meta {
+        margin-left: auto;
         font-size: 12px;
-        color: rgba(255,255,255,0.9);
+        font-weight: 700;
+        color: var(--muted);
+        display: flex;
+        gap: 10px;
+        align-items: center;
+      }
+      .link {
+        color: rgba(255, 255, 255, 0.55);
+        text-decoration: none;
+      }
+      .link:hover {
+        color: rgba(255, 255, 255, 0.85);
+      }
+
+      /* The Dia-like strip */
+      .stripWrap {
+        padding: 10px 10px 12px;
+      }
+
+      #strip {
+        display: flex;
+        align-items: center;
+        gap: 10px; /* gap between GROUP pills */
+        overflow-x: auto;
+        overflow-y: hidden;
+        padding-bottom: 6px;
+        scroll-snap-type: x proximity;
+      }
+      #strip::-webkit-scrollbar {
+        height: 8px;
+      }
+      #strip::-webkit-scrollbar-thumb {
+        background: rgba(255, 255, 255, 0.14);
+        border-radius: 999px;
+      }
+
+      /* GROUP pill container */
+      .groupPill {
+        --c: #7aa7ff;
+
+        position: relative;
+        display: flex;
+        align-items: stretch;
+        gap: 0;
+
+        border-radius: 14px;
+        overflow: hidden;
+        min-height: 34px;
+
+        /* Full colored background behind tabs (Dia style) */
+        background: linear-gradient(
+          180deg,
+          color-mix(in srgb, var(--c) 74%, transparent) 0%,
+          color-mix(in srgb, var(--c) 40%, transparent) 45%,
+          color-mix(in srgb, var(--c) 16%, transparent) 70%,
+          transparent 100%
+        );
+
+        box-shadow:
+          0 14px 28px rgba(0, 0, 0, 0.42),
+          inset 0 1px 0 rgba(255, 255, 255, 0.1);
+
+        scroll-snap-align: start;
+      }
+
+      .groupPill::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: radial-gradient(
+          160px 90px at 16% 10%,
+          rgba(255, 255, 255, 0.14),
+          transparent 70%
+        );
+        pointer-events: none;
+      }
+
+      /* left group label inside pill */
+      .gLabel {
+        position: relative;
+        z-index: 1;
+
+        display: flex;
+        align-items: center;
+        gap: 8px;
+
+        padding: 0 8px 0 10px;
+        font-size: 12px;
+        font-weight: 900;
+        color: color-mix(in srgb, var(--c) 38%, #fff);
+
+        border-right: 1px solid rgba(255, 255, 255, 0.1);
         white-space: nowrap;
+        max-width: 140px;
+      }
+      .gDot {
+        width: 10px;
+        height: 10px;
+        border-radius: 999px;
+        background: var(--c);
+        box-shadow: 0 10px 18px rgba(0, 0, 0, 0.35);
+        flex-shrink: 0;
+      }
+      .gText {
         overflow: hidden;
         text-overflow: ellipsis;
-        max-width: 75px;
+        white-space: nowrap;
       }
 
-      .tab-overflow {
-        font-size: 11px;
-        color: rgba(255,255,255,0.4);
-        flex-shrink: 0;
-        padding: 0 2px;
-      }
-
-      .group-close {
-        flex-shrink: 0;
-        width: 22px;
-        height: 22px;
-        border-radius: 50%;
-        background: rgba(255,255,255,0.07);
-        border: none;
-        color: rgba(255,255,255,0.5);
-        font-size: 14px;
-        line-height: 1;
-        cursor: pointer;
+      /* group actions on right side of pill */
+      .gActions {
+        position: relative;
+        z-index: 1;
         display: flex;
         align-items: center;
-        justify-content: center;
-        transition: background 0.15s, color 0.15s;
+        gap: 6px;
+        padding: 0 8px;
+        border-left: 1px solid rgba(255, 255, 255, 0.1);
       }
-      .group-close:hover {
-        background: rgba(255,59,48,0.25);
+      .gBtn {
+        width: 22px;
+        height: 22px;
+        border: none;
+        border-radius: 999px;
+        cursor: pointer;
+        color: rgba(255, 255, 255, 0.65);
+
+        /* top strong -> bottom transparent */
+        background: linear-gradient(
+          180deg,
+          rgba(255, 255, 255, 0.16),
+          rgba(255, 255, 255, 0)
+        );
+        transition:
+          transform 0.12s ease,
+          background 0.15s ease,
+          color 0.15s ease;
+      }
+      .gBtn:hover {
+        transform: translateY(-1px);
+        background: linear-gradient(
+          180deg,
+          rgba(255, 255, 255, 0.22),
+          rgba(255, 255, 255, 0.05)
+        );
+        color: rgba(255, 255, 255, 0.88);
+      }
+      .gBtn.danger:hover {
+        background: linear-gradient(
+          180deg,
+          rgba(255, 59, 48, 0.34),
+          rgba(255, 59, 48, 0.08)
+        );
         color: #ff3b30;
       }
 
-      /* ── Footer ── */
-      .footer {
-        border-top: 1px solid rgba(255,255,255,0.08);
-        padding: 8px 16px;
-        text-align: right;
+      /* tabs inside pill: Dia-like segments, not chips */
+      .tabs {
+        position: relative;
+        z-index: 1;
+        display: flex;
+        align-items: stretch;
+        gap: 0;
+        max-width: 520px;
       }
-      .footer a {
+
+      .tabSeg {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 0 8px;
+        min-width: 96px;
+        max-width: 220px;
+        height: 34px;
+
+        cursor: pointer;
+        user-select: none;
+
+        /* “tab” segment */
+        background: rgba(0, 0, 0, 0.22);
+        transition:
+          background 0.15s ease,
+          transform 0.12s ease;
+
+        border-right: 1px solid rgba(255, 255, 255, 0.1);
+      }
+      .tabSeg:hover {
+        background: rgba(0, 0, 0, 0.16);
+        transform: translateY(-1px);
+      }
+      .tabSeg.active {
+        background: rgba(255, 255, 255, 0.1);
+      }
+
+      .fav {
+        width: 14px;
+        height: 14px;
+        border-radius: 3px;
+        object-fit: contain;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.22);
+        flex-shrink: 0;
+      }
+
+      .tTitle {
         font-size: 12px;
-        color: rgba(255,255,255,0.4);
-        text-decoration: none;
+        font-weight: 800;
+        color: rgba(255, 255, 255, 0.92);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        max-width: 140px;
       }
-      .footer a:hover { color: rgba(255,255,255,0.7); }
+
+      .tX {
+        margin-left: auto;
+        width: 18px;
+        height: 18px;
+        border: none;
+        border-radius: 999px;
+        cursor: pointer;
+        color: rgba(255, 255, 255, 0.55);
+        background: linear-gradient(
+          180deg,
+          rgba(255, 255, 255, 0.14),
+          rgba(255, 255, 255, 0)
+        );
+        transition:
+          background 0.15s ease,
+          color 0.15s ease;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+      }
+      .tX:hover {
+        background: linear-gradient(
+          180deg,
+          rgba(255, 59, 48, 0.34),
+          rgba(255, 59, 48, 0.08)
+        );
+        color: #ff3b30;
+      }
+
+      .more {
+        display: flex;
+        align-items: center;
+        padding: 0 10px;
+        height: 34px;
+        font-size: 12px;
+        font-weight: 900;
+        color: rgba(255, 255, 255, 0.62);
+        background: rgba(0, 0, 0, 0.18);
+      }
+
+      .empty {
+        color: rgba(255, 255, 255, 0.35);
+        font-size: 13px;
+        padding: 16px 6px;
+      }
     </style>
   </head>
+
   <body>
-
-    <!-- Header -->
-    <div class="header">
-      <span style="font-size:17px">⚡</span>
-      <span class="header-title">TinyTab</span>
-      <label class="switch" title="Enable / Disable">
-        <input id="enabled" type="checkbox" />
-        <span class="slider"></span>
-      </label>
-    </div>
-
-    <!-- Settings -->
-    <div class="settings">
-      <div class="row">
-        <span>Auto arrange</span>
-        <label class="switch">
-          <input id="autoArrange" type="checkbox" />
-          <span class="slider"></span>
-        </label>
+    <div class="top">
+      <div class="dotbar">
+        <div class="dot r"></div>
+        <div class="dot y"></div>
+        <div class="dot g"></div>
       </div>
-      <div class="row">
-        <span>Auto group</span>
-        <label class="switch">
-          <input id="autoGroup" type="checkbox" />
-          <span class="slider"></span>
-        </label>
+
+      <div class="brand">
+        <div class="logo"></div>
+        <div class="title">TinyTab</div>
       </div>
-      <div class="row">
-        <span>Ungroup before regroup</span>
-        <label class="switch">
-          <input id="ungroupBeforeGrouping" type="checkbox" />
-          <span class="slider"></span>
-        </label>
+
+      <div class="meta">
+        <span id="groupsCount">0</span>
+        <a class="link" href="#" id="refresh">Refresh</a>
+        <a class="link" href="#" id="openOptions">Options</a>
       </div>
     </div>
 
-    <!-- Active Groups -->
-    <div class="groups-header">
-      <span class="groups-label">Active Groups</span>
-      <span class="groups-count" id="groupsCount"></span>
-    </div>
-    <div id="groupList"><div class="no-groups">No active groups</div></div>
-
-    <!-- Footer -->
-    <div class="footer">
-      <a href="#" id="openOptions">Browser mode &amp; options</a>
+    <div class="stripWrap">
+      <div id="strip"><div class="empty">Loading…</div></div>
     </div>
 
     <script src="popup.js"></script>
