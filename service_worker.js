@@ -4,6 +4,7 @@ const DEFAULTS = {
   enabled: true,
   onboardingDone: false,
   browserMode: "CHROME", // "DIA" | "CHROME"
+  colorTheme: "default",
   excludedHosts: [],
 
   // Chrome-mode behavior (your choice "2"):
@@ -42,6 +43,15 @@ function isRenamableUrl(url) {
 /* ------------------------
    Registrable domain
    ------------------------ */
+function getGroupingKey(host) {
+  if (!host) return "unknown";
+  const reg = registrableDomain(host) || host;
+  if (reg === "google.com") {
+    return host.replace(/^www\./, "");
+  }
+  return reg;
+}
+
 function registrableDomain(host) {
   if (!host) return "";
   const parts = host.split(".").filter(Boolean);
@@ -84,6 +94,41 @@ function stripTrailingSitePart(title, domainLbl) {
   return t.trim();
 }
 
+const STOP_WORDS = new Set([
+  "the",
+  "and",
+  "or",
+  "to",
+  "of",
+  "in",
+  "on",
+  "for",
+  "with",
+  "at",
+  "from",
+  "a",
+  "an",
+  "is",
+  "are",
+  "was",
+  "were",
+  "home",
+  "dashboard",
+  "page",
+  "tab",
+  "new",
+  "login",
+  "sign",
+  "signin",
+  "signup",
+  "settings",
+  "account",
+  "accounts",
+  "watch",
+  "video",
+  "channel",
+]);
+
 function tokenizeWords(s) {
   const raw = (s || "")
     .toLowerCase()
@@ -93,47 +138,12 @@ function tokenizeWords(s) {
 
   if (!raw) return [];
 
-  const stop = new Set([
-    "the",
-    "and",
-    "or",
-    "to",
-    "of",
-    "in",
-    "on",
-    "for",
-    "with",
-    "at",
-    "from",
-    "a",
-    "an",
-    "is",
-    "are",
-    "was",
-    "were",
-    "home",
-    "dashboard",
-    "page",
-    "tab",
-    "new",
-    "login",
-    "sign",
-    "signin",
-    "signup",
-    "settings",
-    "account",
-    "accounts",
-    "watch",
-    "video",
-    "channel",
-  ]);
-
   return raw
     .split(" ")
     .filter(Boolean)
     .filter((w) => w.length >= 3)
-    .filter((w) => !stop.has(w))
-    .filter((w) => !/^\d+$/.test(w)); // skip pure numbers
+    .filter((w) => !STOP_WORDS.has(w))
+    .filter((w) => !/^\d+$/.test(w));
 }
 
 function shortestUniqueOneWord(labels) {
@@ -299,18 +309,27 @@ async function applyTitle(tabId, title) {
 
 async function restoreAll() {
   const tabs = await chrome.tabs.query({});
-  for (const t of tabs) {
-    if (t.id == null) continue;
-    try {
-      await chrome.tabs.sendMessage(t.id, { type: "RESTORE_TITLE" });
-    } catch {}
-  }
+  await Promise.allSettled(
+    tabs
+      .filter((t) => t.id != null)
+      .map((t) =>
+        chrome.tabs
+          .sendMessage(t.id, { type: "RESTORE_TITLE" })
+          .catch(() => {}),
+      ),
+  );
 }
 
 /* ------------------------
    Chrome mode: reorder + real groups
    ------------------------ */
-const GROUP_COLORS = [
+function hashToIndex(str) {
+  let h = 0;
+  for (let i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) >>> 0;
+  return h;
+}
+
+const CHROME_GROUP_COLORS = [
   "grey",
   "blue",
   "red",
@@ -321,10 +340,9 @@ const GROUP_COLORS = [
   "cyan",
   "orange",
 ];
-function pickGroupColor(key) {
-  let h = 0;
-  for (let i = 0; i < key.length; i++) h = (h * 31 + key.charCodeAt(i)) >>> 0;
-  return GROUP_COLORS[h % GROUP_COLORS.length];
+
+function pickChromeGroupColor(key) {
+  return CHROME_GROUP_COLORS[hashToIndex(key) % CHROME_GROUP_COLORS.length];
 }
 
 let isMutatingTabs = false;
@@ -345,8 +363,7 @@ async function arrangeAndGroupChrome(windowId, settings) {
     // Build desired domain → tabs map
     const items = normal.map((t) => {
       const host = hostOf(t.url || "");
-      const reg = registrableDomain(host) || host || "unknown";
-      const key = isGmail(host) ? "mail.google.com" : reg;
+      const key = getGroupingKey(host);
       return { tab: t, key };
     });
 
@@ -400,7 +417,7 @@ async function arrangeAndGroupChrome(windowId, settings) {
             await chrome.tabGroups
               .update(gid, {
                 title: domainLabel(reg),
-                color: pickGroupColor(reg),
+                color: pickChromeGroupColor(reg),
               })
               .catch(() => {});
           }
@@ -436,12 +453,11 @@ async function arrangeAndGroupChrome(windowId, settings) {
         (a.tab.index ?? 0) - (b.tab.index ?? 0),
     );
 
-    // Move tabs to be contiguous by domain
+    // Move tabs to be contiguous by domain (single batched call)
     if (settings.autoArrange) {
-      let targetIndex = pinned.length;
-      for (const it of items) {
-        await chrome.tabs.move(it.tab.id, { index: targetIndex });
-        targetIndex++;
+      const orderedIds = items.map((it) => it.tab.id);
+      if (orderedIds.length) {
+        await chrome.tabs.move(orderedIds, { index: pinned.length });
       }
     }
 
@@ -454,8 +470,7 @@ async function arrangeAndGroupChrome(windowId, settings) {
     const byDom = new Map(); // regDom -> tabIds[]
     for (const t of afterNormal) {
       const host = hostOf(t.url || "");
-      const reg = registrableDomain(host) || host || "unknown";
-      const key = isGmail(host) ? "mail.google.com" : reg;
+      const key = getGroupingKey(host);
       if (!byDom.has(key)) byDom.set(key, []);
       byDom.get(key).push(t.id);
     }
@@ -468,7 +483,7 @@ async function arrangeAndGroupChrome(windowId, settings) {
         const groupId = await chrome.tabs.group({ tabIds: ids });
         await chrome.tabGroups.update(groupId, {
           title: domainLabel(reg),
-          color: pickGroupColor(reg),
+          color: pickChromeGroupColor(reg),
         });
       }
     }
@@ -497,14 +512,23 @@ async function groupSimilarTabsDia(windowId, settings) {
     const byDomain = new Map();
     for (const t of normal) {
       const host = hostOf(t.url || "");
-      const reg = registrableDomain(host) || host || "unknown";
-      const key = isGmail(host) ? "mail.google.com" : reg;
+      const key = getGroupingKey(host);
       if (!byDomain.has(key)) byDomain.set(key, []);
       byDomain.get(key).push(t);
     }
 
     for (const [reg, tabs] of byDomain.entries()) {
-      if (tabs.length < settings.groupMinTabs) continue;
+      // Ungroup tabs that no longer meet the minimum threshold
+      if (tabs.length < settings.groupMinTabs) {
+        const toUngroup = tabs
+          .filter((t) => t.groupId !== -1)
+          .map((t) => t.id)
+          .filter(Boolean);
+        if (toUngroup.length) {
+          await chrome.tabs.ungroup(toUngroup).catch(() => null);
+        }
+        continue;
+      }
 
       // All already share the same group — nothing to do
       const firstGid = tabs[0].groupId;
@@ -545,7 +569,7 @@ async function recomputeAll() {
   const settings = await getSettings();
   if (!settings.enabled) return;
 
-  const currentTabs = await chrome.tabs.query({ currentWindow: true });
+  const currentTabs = await chrome.tabs.query({ lastFocusedWindow: true });
   const windowId = currentTabs[0]?.windowId;
 
   // Chrome mode: reorder + group first
@@ -559,7 +583,7 @@ async function recomputeAll() {
   }
 
   // Then rename
-  const tabs = await chrome.tabs.query({ currentWindow: true });
+  const tabs = await chrome.tabs.query({ lastFocusedWindow: true });
 
   const scopes = new Map(); // scopeKey -> tabs[]
   for (const t of tabs) {
@@ -574,26 +598,29 @@ async function recomputeAll() {
     scopes.get(sk).push(t);
   }
 
+  const titleOps = [];
+
   for (const [, scopeTabs] of scopes.entries()) {
-    const byDomain = new Map(); // regDom -> tabs[]
+    const byDomain = new Map();
     for (const t of scopeTabs) {
       const host = hostOf(t.url || "");
-      const regDom = registrableDomain(host);
-      if (!regDom) continue;
-      if (!byDomain.has(regDom)) byDomain.set(regDom, []);
-      byDomain.get(regDom).push(t);
+      const key = getGroupingKey(host);
+      if (!key) continue;
+      if (!byDomain.has(key)) byDomain.set(key, []);
+      byDomain.get(key).push(t);
     }
 
-    for (const [regDom, domTabs] of byDomain.entries()) {
+    for (const [key, domTabs] of byDomain.entries()) {
       const sorted = [...domTabs].sort(
         (a, b) => (a.index ?? 0) - (b.index ?? 0),
       );
 
       if (sorted.length === 1) {
-        await applyTitle(sorted[0].id, domainLabel(regDom));
+        titleOps.push({ tabId: sorted[0].id, title: domainLabel(key) });
         continue;
       }
 
+      const regDom = registrableDomain(hostOf(sorted[0].url || "")) || key;
       const base = sorted.map((t) =>
         oneWordLabelForTab(t, regDom, hostOf(t.url || "")),
       );
@@ -602,10 +629,14 @@ async function recomputeAll() {
       for (let i = 0; i < sorted.length; i++) {
         const w = uniq[i] || "tab";
         const pretty = w.charAt(0).toUpperCase() + w.slice(1);
-        await applyTitle(sorted[i].id, pretty);
+        titleOps.push({ tabId: sorted[i].id, title: pretty });
       }
     }
   }
+
+  await Promise.allSettled(
+    titleOps.map(({ tabId, title }) => applyTitle(tabId, title)),
+  );
 }
 
 /* ------------------------

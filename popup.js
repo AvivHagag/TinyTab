@@ -1,26 +1,17 @@
+import { THEMES } from "./themes.js";
+
 // Dia-like popup strip that controls real Chrome tabs & groups
-
-const GROUP_COLOR_TO_HEX = {
-  grey: "#9BA0A6",
-  blue: "#7AA7FF",
-  red: "#FF6B6B",
-  yellow: "#F2A36B",
-  green: "#66D6C8",
-  pink: "#F58BB8",
-  purple: "#8E77FF",
-  cyan: "#66D6C8",
-  orange: "#F2A36B",
-};
-
-const BEAUTY = ["#F2A36B", "#7AA7FF", "#8E77FF", "#66D6C8", "#F58BB8"];
 
 function hashToIndex(str) {
   let h = 0;
   for (let i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) >>> 0;
   return h;
 }
-function pickBeauty(key) {
-  return BEAUTY[hashToIndex(key) % BEAUTY.length];
+
+let activeThemeColors = THEMES[0].colors;
+
+function pickThemeColor(key) {
+  return activeThemeColors[hashToIndex(key) % activeThemeColors.length];
 }
 
 function el(tag, cls) {
@@ -44,21 +35,10 @@ async function focusTab(tab) {
   } catch {}
 }
 
-async function closeTab(tabId, groupId) {
+async function closeTab(tabId) {
   try {
     await chrome.tabs.remove(tabId);
   } catch {}
-
-  if (typeof groupId === "number" && groupId !== -1) {
-    try {
-      const remaining = await chrome.tabs.query({ groupId });
-      const settings = await chrome.storage.sync.get({ groupMinTabs: 2 });
-      if (remaining.length > 0 && remaining.length < settings.groupMinTabs) {
-        const ids = remaining.map((t) => t.id).filter(Boolean);
-        if (ids.length) await chrome.tabs.ungroup(ids);
-      }
-    } catch {}
-  }
 }
 
 async function closeGroup(groupId) {
@@ -75,25 +55,36 @@ async function toggleCollapse(group) {
 
 function setEmpty(text) {
   const strip = document.getElementById("strip");
-  strip.innerHTML = `<div class="empty">${text}</div>`;
+  strip.innerHTML = "";
+  const div = el("div", "empty");
+  div.textContent = text;
+  strip.appendChild(div);
 }
 
 function setCount(n) {
   document.getElementById("groupsCount").textContent = String(n || 0);
 }
 
+let renderGeneration = 0;
+
 async function render() {
+  const gen = ++renderGeneration;
   const strip = document.getElementById("strip");
   strip.innerHTML = "";
 
-  const [active] = await chrome.tabs.query({
-    active: true,
-    currentWindow: true,
-  });
+  const [allTabs, groups, settings] = await Promise.all([
+    chrome.tabs.query({ currentWindow: true }),
+    chrome.tabGroups.query({ windowId: chrome.windows.WINDOW_ID_CURRENT }),
+    chrome.storage.sync.get({ colorTheme: "default" }),
+  ]);
+  if (gen !== renderGeneration) return;
 
-  const groups = await chrome.tabGroups.query({
-    windowId: chrome.windows.WINDOW_ID_CURRENT,
-  });
+  const themeObj =
+    THEMES.find((t) => t.id === settings.colorTheme) || THEMES[0];
+  activeThemeColors = themeObj.colors;
+
+  const active = allTabs.find((t) => t.active);
+
   if (!groups.length) {
     setCount(0);
     setEmpty("No groups in this window (Chrome groups).");
@@ -104,15 +95,11 @@ async function render() {
   setCount(groups.length);
 
   for (const g of groups) {
-    const tabs = await chrome.tabs.query({
-      currentWindow: true,
-      groupId: g.id,
-    });
-    tabs.sort((a, b) => (a.index ?? 0) - (b.index ?? 0));
+    const tabs = allTabs
+      .filter((t) => t.groupId === g.id)
+      .sort((a, b) => (a.index ?? 0) - (b.index ?? 0));
 
-    const color =
-      (g.color && GROUP_COLOR_TO_HEX[g.color]) ||
-      pickBeauty(g.title || String(g.id));
+    const color = pickThemeColor(g.title || String(g.id));
 
     const pill = el("div", "groupPill");
     pill.style.setProperty("--c", color);
@@ -150,7 +137,7 @@ async function render() {
       x.title = "Close tab";
       x.addEventListener("click", async (e) => {
         e.stopPropagation();
-        await closeTab(t.id, t.groupId);
+        await closeTab(t.id);
         await render();
       });
 
@@ -208,13 +195,22 @@ document.getElementById("openOptions").addEventListener("click", (e) => {
 });
 
 let renderTimer = null;
-let renderGeneration = 0;
-func; // live refresh while popup is open
-chrome.tabs.onCreated.addListener(render);
-chrome.tabs.onRemoved.addListener(render);
-chrome.tabs.onUpdated.addListener(render);
-chrome.tabs.onMoved.addListener(render);
-chrome.tabs.onActivated.addListener(render);
-chrome.tabGroups?.onCreated?.addListener(render);
-chrome.tabGroups?.onUpdated?.addListener(render);
-chrome.tabGroups?.onRemoved?.addListener(render);
+function scheduleRender() {
+  clearTimeout(renderTimer);
+  renderTimer = setTimeout(
+    () => render().catch(() => setEmpty("Failed to load")),
+    200,
+  );
+}
+
+// live refresh while popup is open
+chrome.tabs.onCreated.addListener(scheduleRender);
+chrome.tabs.onRemoved.addListener(scheduleRender);
+chrome.tabs.onUpdated.addListener(scheduleRender);
+chrome.tabs.onMoved.addListener(scheduleRender);
+chrome.tabs.onActivated.addListener(scheduleRender);
+chrome.tabGroups?.onCreated?.addListener(scheduleRender);
+chrome.tabGroups?.onUpdated?.addListener(scheduleRender);
+chrome.tabGroups?.onRemoved?.addListener(scheduleRender);
+
+render().catch(() => setEmpty("Failed to load"));

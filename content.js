@@ -42,6 +42,6 @@
         chrome.runtime.sendMessage({ type: "PAGE_TITLE_CHANGED" });
       } catch (_) {}
     });
-    obs.observe(titleEl, { childList: true });
+    obs.observe(titleEl, { childList: true, characterData: true, subtree: true });
   }
 })();

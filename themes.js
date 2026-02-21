@@ -1,0 +1,22 @@
+export const THEMES = [
+  { id: "default", name: "Classic Soft", colors: ["#F2A36B", "#7AA7FF", "#8E77FF", "#66D6C8", "#F58BB8", "#E6A8D7", "#9EDE73", "#F2C46B", "#85C7F2"] },
+  { id: "sunset", name: "Sunset Vibes", colors: ["#ff7b54", "#ffb26b", "#ffd56b", "#939b62", "#d9534f", "#f0a25c", "#e87a5d", "#f3b562", "#8c271e", "#f2935c", "#f9d08b"] },
+  { id: "ocean", name: "Deep Ocean", colors: ["#00a8cc", "#142850", "#27496d", "#0c7b93", "#aee6e6", "#5aa7a7", "#1a5f7a", "#22668d", "#8ecae6", "#219ebc", "#023047", "#8ebbb4"] },
+  { id: "forest", name: "Forest Canopy", colors: ["#2d4030", "#4a5d23", "#8f974a", "#c4b04f", "#e6cca9", "#788b48", "#5b7042", "#a6b158", "#3f5a36", "#bc9f4c", "#e1c391"] },
+  { id: "berry", name: "Wild Berry", colors: ["#4a0e4e", "#81226a", "#b53c82", "#e36588", "#f6a6b2", "#d44a7f", "#9d2a6a", "#c84b8c", "#a2195b", "#ec82a4", "#f7b8c2"] },
+  { id: "pastel", name: "Pastel Dream", colors: ["#ffb3ba", "#ffdfba", "#ffffba", "#baffc9", "#bae1ff", "#d3baff", "#ffbaf2", "#fcd1d1", "#fdf4c8", "#c8e7e1", "#cce2cb", "#d5cff9"] },
+  { id: "neon", name: "Cyber Neon", colors: ["#ff00ff", "#00ffff", "#00ff00", "#ffff00", "#ff0000", "#ff8800", "#bd00ff", "#00d0ff", "#a2ff00", "#ffc400", "#ff3366", "#d900ff"] },
+  { id: "monochrome", name: "Monochrome", colors: ["#1a1a1a", "#333333", "#4d4d4d", "#666666", "#808080", "#999999", "#b3b3b3", "#cccccc", "#e6e6e6", "#262626", "#737373", "#8c8c8c"] },
+  { id: "autumn", name: "Autumn Leaves", colors: ["#5c1a06", "#8a2b0e", "#b94618", "#d96f2a", "#f2a04e", "#e38634", "#bd3b1b", "#d05623", "#e07a2d", "#c5521e", "#a1310d"] },
+  { id: "spring", name: "Spring Blossom", colors: ["#f28e2b", "#fdc141", "#c5d86d", "#4ea971", "#21826b", "#8abc74", "#66b27e", "#f5a34a", "#eac06a", "#7eb366", "#3c9878", "#a5cc7b"] },
+  { id: "winter", name: "Winter Frost", colors: ["#e0fbfc", "#c2dfe3", "#9db4c0", "#5c6b73", "#253237", "#768c99", "#a8c0cf", "#d3e5e8", "#8aa5b5", "#475962", "#34454d"] },
+  { id: "volcano", name: "Volcano Ash", colors: ["#f2112d", "#ff5833", "#ff8b33", "#ffc433", "#3a3a3a", "#5e5e5e", "#e51c31", "#e64e2e", "#f2792b", "#e5ad2e", "#4d4d4d"] },
+  { id: "lavender", name: "Lavender Field", colors: ["#e6e6fa", "#d8bfd8", "#dda0dd", "#ee82ee", "#da70d6", "#ba55d3", "#ce93d8", "#dfb8df", "#d38ad3", "#c77cc7", "#f3bcf3"] },
+  { id: "coral", name: "Coral Reef", colors: ["#ff7f50", "#ff6b81", "#ff5e9c", "#ff52b9", "#f54cd8", "#e36ff2", "#ff8a66", "#ff798e", "#ff6ea6", "#f05ccf", "#ec5ee5"] },
+  { id: "emerald", name: "Emerald Sea", colors: ["#05668d", "#028090", "#00a896", "#02c39a", "#f0f3bd", "#009886", "#04729f", "#0297a7", "#00bba6", "#03d4a6", "#c3c99a"] },
+  { id: "retro", name: "Retro 80s", colors: ["#f9c80e", "#f86624", "#ea3546", "#662e9b", "#43bccd", "#cf4170", "#e8ba0d", "#e35e23", "#d63141", "#5d2a8d", "#3baaba", "#bc3b66"] },
+  { id: "midnight", name: "Midnight Glow", colors: ["#0b132b", "#1c2541", "#3a506b", "#5bc0be", "#6fffe9", "#49a8a7", "#131f42", "#243054", "#455e7c", "#6ad7d6", "#82ffed", "#55bcbb"] },
+  { id: "desert", name: "Desert Sand", colors: ["#cb997e", "#eddcd2", "#fff1e6", "#f0efeb", "#ddbea9", "#a5a58d", "#b7b7a4", "#bc8a70", "#e2d1c7", "#ebdcd0", "#ceb09d", "#9a9a84"] },
+  { id: "coffee", name: "Coffee Shop", colors: ["#4b3832", "#854442", "#fff4e6", "#3c2f2f", "#be9b7b", "#a47e5b", "#5c453f", "#964d4a", "#f0e1cf", "#4d3c3c", "#b28f6d", "#967252"] },
+  { id: "candy", name: "Candy Shop", colors: ["#ff99c8", "#fec8d8", "#fcf1e3", "#d0f4de", "#a9def9", "#e4c1f9", "#e68bb4", "#e8b4c4", "#ece0d1", "#bde1cb", "#97c9e3", "#d1aee6"] }
+];
