@@ -44,10 +44,21 @@ async function focusTab(tab) {
   } catch {}
 }
 
-async function closeTab(tabId) {
+async function closeTab(tabId, groupId) {
   try {
     await chrome.tabs.remove(tabId);
   } catch {}
+
+  if (typeof groupId === "number" && groupId !== -1) {
+    try {
+      const remaining = await chrome.tabs.query({ groupId });
+      const settings = await chrome.storage.sync.get({ groupMinTabs: 2 });
+      if (remaining.length > 0 && remaining.length < settings.groupMinTabs) {
+        const ids = remaining.map((t) => t.id).filter(Boolean);
+        if (ids.length) await chrome.tabs.ungroup(ids);
+      }
+    } catch {}
+  }
 }
 
 async function closeGroup(groupId) {
@@ -139,7 +150,7 @@ async function render() {
       x.title = "Close tab";
       x.addEventListener("click", async (e) => {
         e.stopPropagation();
-        await closeTab(t.id);
+        await closeTab(t.id, t.groupId);
         await render();
       });
 
@@ -196,7 +207,9 @@ document.getElementById("openOptions").addEventListener("click", (e) => {
   chrome.runtime.openOptionsPage();
 });
 
-// live refresh while popup is open
+let renderTimer = null;
+let renderGeneration = 0;
+func; // live refresh while popup is open
 chrome.tabs.onCreated.addListener(render);
 chrome.tabs.onRemoved.addListener(render);
 chrome.tabs.onUpdated.addListener(render);
@@ -205,5 +218,3 @@ chrome.tabs.onActivated.addListener(render);
 chrome.tabGroups?.onCreated?.addListener(render);
 chrome.tabGroups?.onUpdated?.addListener(render);
 chrome.tabGroups?.onRemoved?.addListener(render);
-
-render().catch(() => setEmpty("Failed to load"));
