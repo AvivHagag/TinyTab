@@ -1,3 +1,7 @@
+<p align="center">
+  <img width="962" height="1181" alt="TinyTab screenshot" src="https://github.com/user-attachments/assets/4bed5d61-8c9a-465e-be7f-7fa513720f6f" />
+</p>
+
 # TinyTab — Domain Tab Renamer + Auto Groups (Chrome)
 
 TinyTab is a lightweight Chrome extension that automatically:
