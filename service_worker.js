@@ -511,6 +511,17 @@ async function groupSimilarTabsDia(windowId, settings) {
 
   try {
     const all = await chrome.tabs.query({ windowId });
+
+    // Snapshot pinned IDs upfront. In Arc/Dia, sidebar tabs may report
+    // pinned: false through the Chrome API even though they behave as pinned,
+    // so we use this set as a belt-and-suspenders guard on every API call.
+    const pinnedIds = new Set(
+      all
+        .filter((t) => t.pinned)
+        .map((t) => t.id)
+        .filter(Boolean),
+    );
+
     const normal = all.filter(
       (t) => !t.pinned && t.id != null && isRenamableUrl(t.url || ""),
     );
@@ -528,7 +539,7 @@ async function groupSimilarTabsDia(windowId, settings) {
       // Ungroup tabs that no longer meet the minimum threshold
       if (tabs.length < settings.groupMinTabs) {
         const toUngroup = tabs
-          .filter((t) => t.groupId !== -1)
+          .filter((t) => t.groupId !== -1 && !pinnedIds.has(t.id))
           .map((t) => t.id)
           .filter(Boolean);
         if (toUngroup.length) {
@@ -542,9 +553,16 @@ async function groupSimilarTabsDia(windowId, settings) {
       if (firstGid !== -1 && tabs.every((t) => t.groupId === firstGid))
         continue;
 
-      // Group all domain tabs together (reuse an existing group if possible)
-      const tabIds = tabs.map((t) => t.id).filter(Boolean);
-      const existingGid = tabs.find((t) => t.groupId !== -1)?.groupId;
+      // Group all domain tabs together (reuse an existing group if possible).
+      // Explicitly exclude pinned IDs as a final safety net.
+      const tabIds = tabs
+        .map((t) => t.id)
+        .filter((id) => id != null && !pinnedIds.has(id));
+      if (tabIds.length < settings.groupMinTabs) continue;
+
+      const existingGid = tabs.find(
+        (t) => t.groupId !== -1 && !pinnedIds.has(t.id),
+      )?.groupId;
 
       await chrome.tabs
         .group(
