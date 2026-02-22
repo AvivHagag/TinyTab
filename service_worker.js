@@ -168,7 +168,7 @@ function shortestUniqueOneWord(labels) {
   return pref.map((w) => {
     const c = (counts.get(w) || 0) + 1;
     counts.set(w, c);
-    return c === 1 ? w : `${w}${c}`;
+    return c === 1 ? w : `${w} (${c})`;
   });
 }
 
@@ -267,6 +267,13 @@ function youtubeWordFromUrlAndTitle(url, title) {
   return meaningfulPathSegment(url) || "youtube";
 }
 
+const NON_LATIN_RE =
+  /\p{Script=Hebrew}|\p{Script=Arabic}|\p{Script=Han}|\p{Script=Hiragana}|\p{Script=Katakana}|\p{Script=Cyrillic}/u;
+
+function isNonLatinTitle(title) {
+  return NON_LATIN_RE.test(title);
+}
+
 function oneWordLabelForTab(tab, regDom, host) {
   const domLbl = domainLabel(regDom);
   const title = normalizeTitle(tab.title || "");
@@ -289,13 +296,12 @@ function oneWordLabelForTab(tab, regDom, host) {
   }
 
   const stripped = stripTrailingSitePart(title, domLbl);
-  // Fall back to URL path when title is in a non-Latin script or otherwise empty
-  return (
-    tokenizeWords(stripped)[0] ||
-    meaningfulPathSegment(tab.url || "") ||
-    domLbl.toLowerCase() ||
-    "tab"
-  );
+  // Skip tokenization entirely for non-Latin scripts; URL segments are more reliable
+  if (!isNonLatinTitle(stripped)) {
+    const word = tokenizeWords(stripped)[0];
+    if (word) return word;
+  }
+  return meaningfulPathSegment(tab.url || "") || domLbl.toLowerCase() || "tab";
 }
 
 /* ------------------------
@@ -346,6 +352,7 @@ function pickChromeGroupColor(key) {
 }
 
 let isMutatingTabs = false;
+let pendingRecompute = false;
 
 async function arrangeAndGroupChrome(windowId, settings) {
   if ((!settings.autoArrange && !settings.autoGroup) || isMutatingTabs) return;
@@ -566,6 +573,11 @@ function scopeKeyForTab(settings, tab) {
 }
 
 async function recomputeAll() {
+  if (isMutatingTabs) {
+    pendingRecompute = true;
+    return;
+  }
+  pendingRecompute = false;
   const settings = await getSettings();
   if (!settings.enabled) return;
 
@@ -587,11 +599,18 @@ async function recomputeAll() {
 
   const scopes = new Map(); // scopeKey -> tabs[]
   for (const t of tabs) {
+    if (t.pinned) continue;
     if (t.id == null || !isRenamableUrl(t.url || "")) continue;
 
     const host = hostOf(t.url || "");
     if (!host) continue;
-    if (settings.excludedHosts.includes(host)) continue;
+    const key = getGroupingKey(host);
+    if (
+      settings.excludedHosts.some(
+        (e) => getGroupingKey(hostOf(`https://${e}`)) === key || e === host,
+      )
+    )
+      continue;
 
     const sk = scopeKeyForTab(settings, t);
     if (!scopes.has(sk)) scopes.set(sk, []);
@@ -637,6 +656,11 @@ async function recomputeAll() {
   await Promise.allSettled(
     titleOps.map(({ tabId, title }) => applyTitle(tabId, title)),
   );
+
+  if (pendingRecompute) {
+    pendingRecompute = false;
+    scheduleRecompute();
+  }
 }
 
 /* ------------------------
