@@ -43,8 +43,27 @@ function isRenamableUrl(url) {
 /* ------------------------
    Registrable domain
    ------------------------ */
+
+// Returns true for bare IPv4 addresses with an optional port,
+// e.g. "192.168.1.1", "172.35.192.60:3000"
+function isIpHost(host) {
+  return /^\d{1,3}(\.\d{1,3}){3}(:\d+)?$/.test(host);
+}
+
+// For an IP host, grouping key = last-two-octets + port (if any).
+// e.g. "172.35.192.60:3000" → "192.60:3000"
+//      "172.35.192.60"      → "192.60"
+function ipGroupingKey(host) {
+  const colonIdx = host.indexOf(":");
+  const ip = colonIdx === -1 ? host : host.slice(0, colonIdx);
+  const port = colonIdx === -1 ? "" : host.slice(colonIdx); // ":3000" or ""
+  const octets = ip.split(".");
+  return octets.slice(-2).join(".") + port;
+}
+
 function getGroupingKey(host) {
   if (!host) return "unknown";
+  if (isIpHost(host)) return ipGroupingKey(host);
   const reg = registrableDomain(host) || host;
   if (reg === "google.com") {
     return host.replace(/^www\./, "");
@@ -67,6 +86,10 @@ function registrableDomain(host) {
 
 function domainLabel(regDom) {
   if (!regDom) return "Site";
+  // IP key like "192.60:3000" or "192.60" → label "192.60" (port stripped)
+  if (/^\d+\.\d+(:\d+)?$/.test(regDom)) {
+    return regDom.split(":")[0];
+  }
   const first = regDom.split(".")[0] || regDom;
   return first.charAt(0).toUpperCase() + first.slice(1);
 }
@@ -409,28 +432,17 @@ async function arrangeAndGroupChrome(windowId, settings) {
           break;
         }
         const grp = groupById.get(firstGid);
-        if (!grp || grp.title !== domainLabel(reg)) {
+        if (
+          !grp ||
+          grp.title !== domainLabel(reg) ||
+          grp.color !== pickChromeGroupColor(reg)
+        ) {
           alreadyCorrect = false;
           break;
         }
       }
 
-      if (alreadyCorrect) {
-        // Groups are already right — just ensure color/title are up to date
-        for (const [reg, tabs] of desiredByDom.entries()) {
-          if (tabs.length < settings.groupMinTabs) continue;
-          const gid = tabs[0].groupId;
-          if (gid !== -1) {
-            await chrome.tabGroups
-              .update(gid, {
-                title: domainLabel(reg),
-                color: pickChromeGroupColor(reg),
-              })
-              .catch(() => {});
-          }
-        }
-        return;
-      }
+      if (alreadyCorrect) return; // structure, titles, and colors all correct
     }
 
     // Groups need rebuilding — do the full arrange + regroup
@@ -536,9 +548,12 @@ async function groupSimilarTabsDia(windowId, settings) {
     }
 
     for (const [reg, tabs] of byDomain.entries()) {
+      // Sort by current index so operations preserve the user's visual order.
+      const sorted = [...tabs].sort((a, b) => (a.index ?? 0) - (b.index ?? 0));
+
       // Ungroup tabs that no longer meet the minimum threshold
-      if (tabs.length < settings.groupMinTabs) {
-        const toUngroup = tabs
+      if (sorted.length < settings.groupMinTabs) {
+        const toUngroup = sorted
           .filter((t) => t.groupId !== -1 && !pinnedIds.has(t.id))
           .map((t) => t.id)
           .filter(Boolean);
@@ -549,26 +564,38 @@ async function groupSimilarTabsDia(windowId, settings) {
       }
 
       // All already share the same group — nothing to do
-      const firstGid = tabs[0].groupId;
-      if (firstGid !== -1 && tabs.every((t) => t.groupId === firstGid))
+      const firstGid = sorted[0].groupId;
+      if (firstGid !== -1 && sorted.every((t) => t.groupId === firstGid))
         continue;
 
-      // Group all domain tabs together (reuse an existing group if possible).
-      // Explicitly exclude pinned IDs as a final safety net.
-      const tabIds = tabs
-        .map((t) => t.id)
-        .filter((id) => id != null && !pinnedIds.has(id));
-      if (tabIds.length < settings.groupMinTabs) continue;
-
-      const existingGid = tabs.find(
+      // Reuse an existing group if any tab already belongs to one.
+      const existingGid = sorted.find(
         (t) => t.groupId !== -1 && !pinnedIds.has(t.id),
       )?.groupId;
+
+      // Only pass tabs NOT already in the target group.
+      // Passing already-grouped tabs lets Chrome reorder them — we avoid that.
+      const tabsToAdd =
+        existingGid != null
+          ? sorted.filter(
+              (t) => t.groupId !== existingGid && !pinnedIds.has(t.id),
+            )
+          : sorted.filter((t) => !pinnedIds.has(t.id));
+
+      const tabIds = tabsToAdd.map((t) => t.id).filter(Boolean);
+
+      // For a brand-new group we still need the minimum number of tabs.
+      if (existingGid == null && tabIds.length < settings.groupMinTabs)
+        continue;
+      if (tabIds.length === 0) continue;
 
       await chrome.tabs
         .group(
           existingGid != null ? { tabIds, groupId: existingGid } : { tabIds },
         )
-        .catch(() => null);
+        .catch((err) =>
+          console.warn("[TinyTab] groupSimilarTabsDia: group failed", err),
+        );
     }
   } finally {
     setTimeout(() => {
@@ -615,6 +642,14 @@ async function recomputeAll() {
   // Then rename
   const tabs = await chrome.tabs.query({ lastFocusedWindow: true });
 
+  // Pre-compute excluded grouping keys once so we don't call getGroupingKey
+  // for every excluded entry on every tab in the loop below.
+  const excludedKeySet = new Set(
+    settings.excludedHosts
+      .map((e) => getGroupingKey(hostOf(`https://${e}`)))
+      .filter(Boolean),
+  );
+
   const scopes = new Map(); // scopeKey -> tabs[]
   for (const t of tabs) {
     if (t.pinned) continue;
@@ -623,12 +658,7 @@ async function recomputeAll() {
     const host = hostOf(t.url || "");
     if (!host) continue;
     const key = getGroupingKey(host);
-    if (
-      settings.excludedHosts.some(
-        (e) => getGroupingKey(hostOf(`https://${e}`)) === key || e === host,
-      )
-    )
-      continue;
+    if (excludedKeySet.has(key)) continue;
 
     const sk = scopeKeyForTab(settings, t);
     if (!scopes.has(sk)) scopes.set(sk, []);
