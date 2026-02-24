@@ -11,7 +11,6 @@ const DEFAULTS = {
   autoArrange: true,
   autoGroup: true,
   groupMinTabs: 2,
-  ungroupBeforeGrouping: true,
 };
 
 chrome.runtime.onInstalled.addListener(async () => {
@@ -446,16 +445,6 @@ async function arrangeAndGroupChrome(windowId, settings) {
     }
 
     // Groups need rebuilding — do the full arrange + regroup
-    if (settings.autoGroup && settings.ungroupBeforeGrouping) {
-      const idsToUngroup = normal
-        .filter((t) => typeof t.groupId === "number" && t.groupId !== -1)
-        .map((t) => t.id);
-
-      if (idsToUngroup.length) {
-        await chrome.tabs.ungroup(idsToUngroup);
-      }
-    }
-
     // Anchor each domain at the smallest current index among its tabs.
     // This keeps existing groups where they are — new tabs from the same
     // domain are pulled in next to the group instead of the whole group
@@ -499,11 +488,32 @@ async function arrangeAndGroupChrome(windowId, settings) {
       for (const [reg, ids] of byDom.entries()) {
         if (ids.length < settings.groupMinTabs) continue;
 
-        const groupId = await chrome.tabs.group({ tabIds: ids });
-        await chrome.tabGroups.update(groupId, {
-          title: domainLabel(reg),
-          color: pickChromeGroupColor(reg),
-        });
+        // Try to reuse an existing group from these tabs
+        const originalTabs = desiredByDom.get(reg) || [];
+        const existingGid = originalTabs.find(
+          (t) => t.groupId !== -1,
+        )?.groupId;
+
+        let groupId;
+        try {
+          groupId = await chrome.tabs.group(
+            existingGid != null
+              ? { tabIds: ids, groupId: existingGid }
+              : { tabIds: ids },
+          );
+        } catch (err) {
+          // Fallback if the group was implicitly destroyed or invalid
+          groupId = await chrome.tabs.group({ tabIds: ids }).catch(() => null);
+        }
+
+        if (groupId != null) {
+          await chrome.tabGroups
+            .update(groupId, {
+              title: domainLabel(reg),
+              color: pickChromeGroupColor(reg),
+            })
+            .catch(() => {});
+        }
       }
     }
   } finally {
@@ -611,10 +621,12 @@ function scopeKeyForTab(settings, tab) {
   // Dia mode: uniqueness inside each group (domain-grouped or Dia-native)
   if (settings.browserMode === "DIA") {
     const gid = tab.groupId;
-    return typeof gid === "number" && gid !== -1 ? `g:${gid}` : "g:ungrouped";
+    return typeof gid === "number" && gid !== -1
+      ? `g:${gid}`
+      : `g:ungrouped-${tab.windowId}`;
   }
   // Chrome mode: whole window as one scope (because we group by domain anyway)
-  return "w:current";
+  return `w:${tab.windowId}`;
 }
 
 async function recomputeAll() {
@@ -626,21 +638,21 @@ async function recomputeAll() {
   const settings = await getSettings();
   if (!settings.enabled) return;
 
-  const currentTabs = await chrome.tabs.query({ lastFocusedWindow: true });
-  const windowId = currentTabs[0]?.windowId;
+  const windows = await chrome.windows.query({ windowTypes: ["normal"] });
+  for (const win of windows) {
+    // Chrome mode: reorder + group first
+    if (settings.browserMode === "CHROME" && win.id != null) {
+      await arrangeAndGroupChrome(win.id, settings);
+    }
 
-  // Chrome mode: reorder + group first
-  if (settings.browserMode === "CHROME" && windowId != null) {
-    await arrangeAndGroupChrome(windowId, settings);
-  }
-
-  // Dia mode: group tabs that share the same domain (without reordering)
-  if (settings.browserMode === "DIA" && windowId != null) {
-    await groupSimilarTabsDia(windowId, settings);
+    // Dia mode: group tabs that share the same domain (without reordering)
+    if (settings.browserMode === "DIA" && win.id != null) {
+      await groupSimilarTabsDia(win.id, settings);
+    }
   }
 
   // Then rename
-  const tabs = await chrome.tabs.query({ lastFocusedWindow: true });
+  const tabs = await chrome.tabs.query({});
 
   // Pre-compute excluded grouping keys once so we don't call getGroupingKey
   // for every excluded entry on every tab in the loop below.
@@ -727,6 +739,8 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
     scheduleRecompute();
 });
 chrome.tabs.onMoved.addListener(scheduleRecompute);
+chrome.tabs.onDetached.addListener(scheduleRecompute);
+chrome.tabs.onAttached.addListener(scheduleRecompute);
 chrome.tabs.onActivated.addListener(scheduleRecompute);
 
 chrome.tabGroups?.onCreated?.addListener(scheduleRecompute);
