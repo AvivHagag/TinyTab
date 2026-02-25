@@ -490,9 +490,7 @@ async function arrangeAndGroupChrome(windowId, settings) {
 
         // Try to reuse an existing group from these tabs
         const originalTabs = desiredByDom.get(reg) || [];
-        const existingGid = originalTabs.find(
-          (t) => t.groupId !== -1,
-        )?.groupId;
+        const existingGid = originalTabs.find((t) => t.groupId !== -1)?.groupId;
 
         let groupId;
         try {
@@ -638,7 +636,7 @@ async function recomputeAll() {
   const settings = await getSettings();
   if (!settings.enabled) return;
 
-  const windows = await chrome.windows.query({ windowTypes: ["normal"] });
+  const windows = await chrome.windows.getAll({ windowTypes: ["normal"] });
   for (const win of windows) {
     // Chrome mode: reorder + group first
     if (settings.browserMode === "CHROME" && win.id != null) {
